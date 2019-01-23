@@ -99,13 +99,14 @@ EXEC (@sql)
 
 SET @count = @count + 1
 SET @minID = ''
---SET @oserverID = ''
 SET @newServerID = ''
 
 END
 
 GO
 
+
+/*
 --COPY
 
 -- Copy server info from donor database to gaining database
@@ -114,3 +115,4 @@ USE ToMergeVMS
 
 INSERT INTO InsightEnt.dbo.Servers
 SELECT * FROM ToMergeVMS.dbo.Servers WHERE ServerStatus = 1 OR ServerStatus = 3;
+*/
