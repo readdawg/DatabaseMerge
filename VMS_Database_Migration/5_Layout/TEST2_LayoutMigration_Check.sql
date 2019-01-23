@@ -1,62 +1,73 @@
---Create MergeStatus, mFileID, mCameraID, mServerID Columns in Gaining InsightEnt
+--Create MergeStatus, mLayoutID, mCameraID, mServerID Columns in Gaining InsightEnt
 USE InsightEnt
-ALTER TABLE dbo.VideoFiles
-ADD MergeStatus int,
-mFileID int,
-mCameraID int,
-mServerID int;
+ALTER TABLE dbo.Layout
+ADD laLayoutID int,
+laServer int,
+laCameraList nvarchar(4000),
+LayoutStatus int;
 GO
 
---Create MergeStatus, mFileID, mCameraID, mServerID Columns in Donor InsightEnt
-USE ToMergeVMS
-ALTER TABLE dbo.VideoFiles
-ADD MergeStatus int,
-mFileID int,
-mCameraID int,
-mServerID int;
+--Create MergeStatus, mLayoutID, mCameraID, mServerID Columns in Donor InsightEnt
+USE ToMergeSS
+ALTER TABLE dbo.Layout
+ADD laLayoutID int,
+laServer int,
+laCameraList nvarchar(4000),
+LayoutStatus int;
 GO
 
 -- Set MergeStatus column to NULL
-UPDATE ToMergeVMS.dbo.VideoFiles
-SET MergeStatus = NULL
+UPDATE ToMergeSS.dbo.Layout
+SET LayoutStatus = NULL
 GO
 
--- Copy FileID, CameraID, ServerID to m columns
-USE ToMergeVMS
-DECLARE @count int = (SELECT min(FileID) FROM ToMergeVMS.dbo.VideoFiles)
+-- Copy LayoutID, CameraID, ServerID to m columns
+-- Check donor ServerID against existing ServerIDs In Gaining Table
+USE ToMergeSS
+DECLARE @count int = 1
 DECLARE @maxID int 
 
-SET @maxID = (SELECT max(FileID) FROM ToMergeVMS.dbo.VideoFiles)
+SET @maxID = (SELECT COUNT(*) FROM ToMergeSS.dbo.Layout)
 
 WHILE @count <= @maxID
 
 BEGIN
 
-DECLARE @mFileID nvarchar(10) = (SELECT min(FileID) FROM ToMergeVMS.dbo.VideoFiles WHERE MergeStatus IS NULL)
-DECLARE @mCameraID nvarchar(10) = (SELECT CameraID FROM ToMergeVMS.dbo.VideoFiles WHERE FileID = @mFileID)
-DECLARE @mServerID nvarchar(10) = (SELECT ServerID FROM ToMergeVMS.dbo.VideoFiles WHERE FileID = @mFileID)
+DECLARE @minLayoutID nvarchar(10) = (SELECT min(LayoutID) FROM ToMergeSS.dbo.Layout WHERE LayoutStatus IS NULL)
+DECLARE @laserverID nvarchar(10) = (SELECT ServerID FROM ToMergeSS.dbo.Layout WHERE LayoutID = @minLayoutID)
+DECLARE @laCameraList nvarchar(4000) = (SELECT CameraList FROM ToMergeSS.dbo.Layout WHERE LayoutID = @minLayoutID)
 
 DECLARE @sql NVARCHAR(max) = '
 
-				BEGIN
+				IF NOT EXISTS (SELECT LayoutID FROM InsightEnt.dbo.Layout WHERE LayoutID = ' + @minLayoutID + ')
+					BEGIN				
 
-					UPDATE ToMergeVMS.dbo.VideoFiles
-					SET mFileID = ' + @mFileID+ ',
-					mServerID = ' + @mServerID + ',
-					mCameraID = ' + @mCameraID + ' WHERE FileID = ' + @mFileID + ';
+						--Not Duplicate LayoutID
+						UPDATE ToMergeSS.dbo.Layout
+						SET laLayoutID = ' + @minLayoutID + ',						
+						laServer = ' + @laserverID + ',
+						laCameraList = ''' + @laCameraList + ''',
+						LayoutStatus = 1 WHERE LayoutID = ' + @minLayoutID +'
+					END				
 
-					UPDATE ToMergeVMS.dbo.VideoFiles
-					SET MergeStatus = 1 WHERE FileID = ' + @mFileID + ';		
+				ELSE
 
-				END				
-							
+					-- Duplicate LayoutID
+					BEGIN
+						UPDATE ToMergeSS.dbo.Layout
+						SET laLayoutID = ' + @minLayoutID + ',						
+						laServer = ' + @laserverID + ',
+						laCameraList = ''' + @laCameraList + ''',
+						LayoutStatus = 2 WHERE LayoutID = ' + @minLayoutID +'
+					END				
 				'			
+
 EXEC (@sql)
 
 SET @count = @count + 1
-SET @mFileID = ''
-SET @mCameraID = ''
-SET @mServerID = ''
+SET @minLayoutID = ''
+SET @laserverID = ''
+SET @laCameraList = ''
 
 END
 
